@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CompNfse xmlns="http://www.abrasf.org.br/nfse.xsd">
+  <Nfse>
+    <InfNfse>
+      <Numero>789</Numero>
+      <CodigoVerificacao>ABCD1234</CodigoVerificacao>
+      <DataEmissao>2026-04-10T09:15:00</DataEmissao>
+      <PrestadorServico>
+        <RazaoSocial>MEI Exemplo Servicos</RazaoSocial>
+        <IdentificacaoPrestador>
+          <Cnpj>12345678000190</Cnpj>
+        </IdentificacaoPrestador>
+      </PrestadorServico>
+      <TomadorServico>
+        <RazaoSocial>Cliente Empresa Sao Paulo</RazaoSocial>
+        <IdentificacaoTomador>
+          <Cnpj>99888777000166</Cnpj>
+        </IdentificacaoTomador>
+      </TomadorServico>
+      <Servico>
+        <Valores>
+          <ValorServicos>2500.00</ValorServicos>
+          <ValorLiquidoNfse>2500.00</ValorLiquidoNfse>
+        </Valores>
+        <Discriminacao>Consultoria e treinamento</Discriminacao>
+      </Servico>
+    </InfNfse>
+  </Nfse>
+</CompNfse>

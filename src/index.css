@@ -901,6 +901,155 @@ body::before {
   }
 }
 
+.btn-link {
+  display: inline-block;
+  margin-top: 0.35rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--verde-folha);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.relogio-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.ano-select {
+  min-width: 7rem;
+}
+
+.meses-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 1.5rem;
+  align-items: end;
+}
+
+.mes-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 6rem;
+  justify-content: flex-end;
+}
+
+.mes-bar {
+  width: 100%;
+  max-width: 2rem;
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(180deg, var(--ouro), var(--verde-folha));
+  opacity: 0.85;
+}
+
+.mes-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.mes-val {
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.cofre-actions.is-dragging .upload-zone {
+  border-color: var(--ouro-forte);
+  background: rgba(232, 196, 90, 0.12);
+  transform: scale(1.01);
+}
+
+.lista-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.lista-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.search {
+  min-width: 12rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--linha);
+  border-radius: 10px;
+  background: white;
+  font: inherit;
+}
+
+.nota-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.55rem;
+}
+
+.check.compact {
+  font-size: 0.9rem;
+}
+
+.ok-msg {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.toast {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 50;
+  max-width: min(24rem, calc(100vw - 2rem));
+  padding: 0.85rem 1.1rem;
+  border-radius: 12px;
+  background: var(--verde-mata);
+  color: #f7fff9;
+  box-shadow: var(--shadow-soft);
+  animation: toast-in 0.28s ease;
+}
+
+.toast-warn {
+  background: #8a4b12;
+}
+
+.toast-erro {
+  background: var(--danger);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 720px) {
+  .meses-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

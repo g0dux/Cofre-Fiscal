@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { CNAE_AMOSTRA } from '../engine/constantes.js'
 import { decidirRegime } from '../engine/decisor.js'
+import { formatBRL } from '../engine/money.js'
 
 const INITIAL = {
   faturamentoAno: '',
@@ -12,11 +13,10 @@ const INITIAL = {
   qtdEmpregados: 1,
 }
 
-export default function DecisorForm({ onResultado }) {
+export default function DecisorForm({ somaCofre = 0 }) {
   const [form, setForm] = useState(INITIAL)
   const [resultado, setResultado] = useState(null)
-
-  const cnaeOptions = useMemo(() => CNAE_AMOSTRA, [])
+  const cnaes = useMemo(() => CNAE_AMOSTRA, [])
 
   function set(field, value) {
     setForm((f) => ({ ...f, [field]: value }))
@@ -24,14 +24,13 @@ export default function DecisorForm({ onResultado }) {
 
   function handleSubmit(e) {
     e.preventDefault()
-    const r = decidirRegime({
-      ...form,
-      faturamentoAno: Number(String(form.faturamentoAno).replace(/\./g, '').replace(',', '.')) || 0,
-      querCnpj: form.querCnpj === true || form.querCnpj === 'true',
-      temEmpregado: form.temEmpregado === true || form.temEmpregado === 'true',
-    })
-    setResultado(r)
-    onResultado?.(r)
+    setResultado(
+      decidirRegime({
+        ...form,
+        querCnpj: form.querCnpj === true || form.querCnpj === 'true',
+        temEmpregado: form.temEmpregado === true || form.temEmpregado === 'true',
+      }),
+    )
   }
 
   return (
@@ -56,6 +55,15 @@ export default function DecisorForm({ onResultado }) {
             onChange={(e) => set('faturamentoAno', e.target.value)}
             required
           />
+          {somaCofre > 0 && (
+            <button
+              type="button"
+              className="btn-link"
+              onClick={() => set('faturamentoAno', String(Math.round(somaCofre * 100) / 100))}
+            >
+              Usar soma do cofre ({formatBRL(somaCofre)})
+            </button>
+          )}
         </label>
 
         <label className="field">
@@ -85,7 +93,7 @@ export default function DecisorForm({ onResultado }) {
           <span>CNAE (amostra — não é lista oficial)</span>
           <select value={form.cnae} onChange={(e) => set('cnae', e.target.value)}>
             <option value="">Não sei / não está na amostra</option>
-            {cnaeOptions.map((c) => (
+            {cnaes.map((c) => (
               <option key={c.codigo} value={c.codigo}>
                 {c.codigo} — {c.nome}
                 {!c.mei ? ' (fora do MEI na amostra)' : ''}
@@ -99,7 +107,6 @@ export default function DecisorForm({ onResultado }) {
           <label className="radio">
             <input
               type="radio"
-              name="querCnpj"
               checked={form.querCnpj === true}
               onChange={() => set('querCnpj', true)}
             />
@@ -108,7 +115,6 @@ export default function DecisorForm({ onResultado }) {
           <label className="radio">
             <input
               type="radio"
-              name="querCnpj"
               checked={form.querCnpj === false}
               onChange={() => set('querCnpj', false)}
             />
@@ -121,7 +127,6 @@ export default function DecisorForm({ onResultado }) {
           <label className="radio">
             <input
               type="radio"
-              name="temEmpregado"
               checked={form.temEmpregado === false}
               onChange={() => set('temEmpregado', false)}
             />
@@ -130,7 +135,6 @@ export default function DecisorForm({ onResultado }) {
           <label className="radio">
             <input
               type="radio"
-              name="temEmpregado"
               checked={form.temEmpregado === true}
               onChange={() => set('temEmpregado', true)}
             />
@@ -155,12 +159,12 @@ export default function DecisorForm({ onResultado }) {
         </button>
       </form>
 
-      {resultado && <ResultadoDecisor resultado={resultado} />}
+      {resultado && <Resultado resultado={resultado} />}
     </div>
   )
 }
 
-function ResultadoDecisor({ resultado }) {
+function Resultado({ resultado }) {
   const tone = {
     alta: 'tone-ok',
     media: 'tone-mid',
@@ -173,25 +177,17 @@ function ResultadoDecisor({ resultado }) {
       <p className="resultado-kicker">Leitura de referência · confira no Portal</p>
       <h3>{resultado.titulo}</h3>
       <p>{resultado.resumo}</p>
-
       {resultado.dasRef && (
         <p className="das-ref">
           DAS de referência ({resultado.dasRef.rotulo}):{' '}
-          <strong>
-            {resultado.dasRef.valor.toLocaleString('pt-BR', {
-              style: 'currency',
-              currency: 'BRL',
-            })}
-          </strong>
+          <strong>{formatBRL(resultado.dasRef.valor)}</strong>
           <span className="muted"> — {resultado.dasRef.nota}</span>
         </p>
       )}
-
       <p className="pct-line">
-        Você já comeu <strong>{resultado.metricas.pctTeto}%</strong> do teto MEI (R${' '}
-        {resultado.metricas.tetoMei.toLocaleString('pt-BR')}), com base no que informou.
+        Você já comeu <strong>{resultado.metricas.pctTeto}%</strong> do teto MEI (
+        {formatBRL(resultado.metricas.tetoMei, { digits: 0 })}), com base no que informou.
       </p>
-
       {resultado.alertas.length > 0 && (
         <div className="lista-bloco">
           <h4>Alertas</h4>
@@ -202,7 +198,6 @@ function ResultadoDecisor({ resultado }) {
           </ul>
         </div>
       )}
-
       {resultado.fazer.length > 0 && (
         <div className="lista-bloco">
           <h4>Fazer</h4>

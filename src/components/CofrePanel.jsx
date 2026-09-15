@@ -1,51 +1,114 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { ANO_REFERENCIA } from '../engine/constantes.js'
+import { baixarXml, exportarJson, importarJson } from '../engine/cofre.js'
+import { formatBRL } from '../engine/money.js'
 import { criarLancamentoManual, parseXmlNota } from '../engine/xml.js'
-import { exportarJson } from '../engine/cofre.js'
 
-export default function CofrePanel({ notas, onAdd, onRemove, onClear }) {
+export default function CofrePanel({
+  notas,
+  ano = ANO_REFERENCIA,
+  onAdd,
+  onAddMany,
+  onRemove,
+  onToggleTeto,
+  onClear,
+  onNotify,
+}) {
   const fileRef = useRef(null)
+  const importRef = useRef(null)
   const [erro, setErro] = useState('')
+  const [ok, setOk] = useState('')
+  const [dragging, setDragging] = useState(false)
+  const [filtro, setFiltro] = useState('')
+  const [somenteAno, setSomenteAno] = useState(true)
   const [manual, setManual] = useState({
-    data: new Date().toISOString().slice(0, 10),
+    data: `${ANO_REFERENCIA}-03-15`,
     descricao: '',
     valor: '',
     contaNoTeto: true,
   })
 
+  const filtradas = useMemo(() => {
+    const q = filtro.trim().toLowerCase()
+    return notas.filter((n) => {
+      if (somenteAno) {
+        const br = String(n.data).match(/(\d{2})\/(\d{2})\/(\d{4})/)
+        const y = br ? Number(br[3]) : ANO_REFERENCIA
+        if (y !== ano) return false
+      }
+      if (!q) return true
+      const blob = `${n.resumo} ${n.emitente} ${n.destinatario} ${n.tipo} ${n.numero}`.toLowerCase()
+      return blob.includes(q)
+    })
+  }, [notas, filtro, somenteAno, ano])
+
   async function handleFiles(files) {
     setErro('')
-    const list = [...files]
+    setOk('')
+    const list = [...(files || [])]
+    if (!list.length) return
+    let okCount = 0
+    const errs = []
     for (const file of list) {
       try {
-        const text = await file.text()
-        const nota = parseXmlNota(text)
-        onAdd(nota)
+        onAdd(parseXmlNota(await file.text()))
+        okCount += 1
       } catch (err) {
-        setErro(err.message || 'Falha ao ler XML.')
+        errs.push(`${file.name}: ${err.message || 'falha'}`)
       }
     }
+    if (okCount) setOk(`${okCount} arquivo(s) processado(s).`)
+    if (errs.length) setErro(errs.join(' · '))
     if (fileRef.current) fileRef.current.value = ''
   }
 
   function handleManual(e) {
     e.preventDefault()
     setErro('')
-    const valor = Number(String(manual.valor).replace(/\./g, '').replace(',', '.'))
-    if (!valor || valor <= 0) {
-      setErro('Informe um valor válido no lançamento manual.')
-      return
+    setOk('')
+    try {
+      const dataBR = manual.data
+        ? manual.data.split('-').reverse().join('/')
+        : new Date().toLocaleDateString('pt-BR')
+      onAdd(
+        criarLancamentoManual({
+          data: dataBR,
+          descricao: manual.descricao,
+          valor: manual.valor,
+          contaNoTeto: manual.contaNoTeto,
+        }),
+      )
+      setManual((m) => ({ ...m, descricao: '', valor: '' }))
+      setOk('Lançamento manual guardado.')
+    } catch (err) {
+      setErro(err.message || 'Falha no lançamento manual.')
     }
-    const dataBR = manual.data
-      ? manual.data.split('-').reverse().join('/')
-      : new Date().toLocaleDateString('pt-BR')
-    const nota = criarLancamentoManual({
-      data: dataBR,
-      descricao: manual.descricao,
-      valor,
-      contaNoTeto: manual.contaNoTeto,
-    })
-    onAdd(nota)
-    setManual((m) => ({ ...m, descricao: '', valor: '' }))
+  }
+
+  async function handleImportJson(file) {
+    setErro('')
+    setOk('')
+    try {
+      const { notas: next, adicionadas, duplicatas } = importarJson(await file.text(), notas)
+      onAddMany(next, `Import: ${adicionadas} nova(s), ${duplicatas} duplicata(s).`)
+      setOk(`Backup importado: +${adicionadas}, ${duplicatas} duplicata(s).`)
+    } catch (err) {
+      setErro(err.message || 'Falha ao importar JSON.')
+    }
+    if (importRef.current) importRef.current.value = ''
+  }
+
+  async function loadSample(name) {
+    setErro('')
+    setOk('')
+    try {
+      const res = await fetch(`/samples/${name}`)
+      if (!res.ok) throw new Error('Amostra não encontrada.')
+      onAdd(parseXmlNota(await res.text()))
+      setOk(`Amostra ${name} carregada.`)
+    } catch (err) {
+      setErro(err.message || 'Falha ao carregar amostra.')
+    }
   }
 
   return (
@@ -54,12 +117,25 @@ export default function CofrePanel({ notas, onAdd, onRemove, onClear }) {
         <p className="eyebrow">Cofre + Tradutor</p>
         <h2>Guarde o XML. Leia em português.</h2>
         <p className="lede">
-          A obrigação de guarda, em geral, é do XML por 5 anos. PDF do DANFE / DANFSE não substitui.
-          Tudo fica neste navegador (localStorage) — some se limpar os dados do site.
+          Guarda local no navegador, com dedupe por chave/fingerprint, import/export e download do
+          XML original. PDF do DANFE não substitui o XML.
         </p>
       </header>
 
-      <div className="cofre-actions">
+      <div
+        className={`cofre-actions ${dragging ? 'is-dragging' : ''}`}
+        onDragEnter={(e) => {
+          e.preventDefault()
+          setDragging(true)
+        }}
+        onDragOver={(e) => e.preventDefault()}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragging(false)
+          handleFiles(e.dataTransfer.files)
+        }}
+      >
         <label className="upload-zone">
           <input
             ref={fileRef}
@@ -69,10 +145,19 @@ export default function CofrePanel({ notas, onAdd, onRemove, onClear }) {
             onChange={(e) => handleFiles(e.target.files)}
           />
           <span className="upload-title">Soltar ou escolher XML</span>
-          <span className="upload-sub">NF-e · NFC-e · NFS-e</span>
+          <span className="upload-sub">NF-e · NFC-e · NFS-e · vários de uma vez</span>
         </label>
 
         <div className="toolbar">
+          <button type="button" className="btn btn-ghost" onClick={() => loadSample('nfe-exemplo.xml')}>
+            Amostra NF-e
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={() => loadSample('nfce-exemplo.xml')}>
+            Amostra NFC-e
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={() => loadSample('nfse-exemplo.xml')}>
+            Amostra NFS-e
+          </button>
           <button
             type="button"
             className="btn btn-ghost"
@@ -81,6 +166,16 @@ export default function CofrePanel({ notas, onAdd, onRemove, onClear }) {
           >
             Exportar JSON
           </button>
+          <label className="btn btn-ghost file-btn">
+            Importar JSON
+            <input
+              ref={importRef}
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={(e) => e.target.files?.[0] && handleImportJson(e.target.files[0])}
+            />
+          </label>
           <button
             type="button"
             className="btn btn-ghost danger"
@@ -94,9 +189,9 @@ export default function CofrePanel({ notas, onAdd, onRemove, onClear }) {
         </div>
       </div>
 
-      {erro && (
-        <p className="erro" role="alert">
-          {erro}
+      {(erro || ok) && (
+        <p className={erro ? 'erro' : 'ok-msg'} role="status">
+          {erro || ok}
         </p>
       )}
 
@@ -125,7 +220,7 @@ export default function CofrePanel({ notas, onAdd, onRemove, onClear }) {
             <input
               type="text"
               inputMode="decimal"
-              placeholder="1500"
+              placeholder="1.500,00"
               value={manual.valor}
               onChange={(e) => setManual((m) => ({ ...m, valor: e.target.value }))}
               required
@@ -146,14 +241,35 @@ export default function CofrePanel({ notas, onAdd, onRemove, onClear }) {
       </form>
 
       <div className="tradutor-lista">
-        <h3>Linhas humanas</h3>
-        {!notas.length && (
+        <div className="lista-toolbar">
+          <h3>Linhas humanas ({filtradas.length})</h3>
+          <div className="lista-filters">
+            <label className="check compact">
+              <input
+                type="checkbox"
+                checked={somenteAno}
+                onChange={(e) => setSomenteAno(e.target.checked)}
+              />
+              Só {ano}
+            </label>
+            <input
+              type="search"
+              className="search"
+              placeholder="Buscar emitente, valor, tipo…"
+              value={filtro}
+              onChange={(e) => setFiltro(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {!filtradas.length && (
           <p className="empty">
-            Nenhum XML ou Pix ainda. O primeiro arquivo verdadeiro é o teste que importa.
+            Nenhum lançamento neste filtro. Carregue uma amostra ou solte um XML real.
           </p>
         )}
+
         <ul>
-          {notas.map((n) => (
+          {filtradas.map((n) => (
             <li key={n.id} className="nota-linha">
               <div>
                 <p className="nota-meta">
@@ -168,14 +284,38 @@ export default function CofrePanel({ notas, onAdd, onRemove, onClear }) {
                 <p className="nota-resumo">{n.resumo}</p>
                 <p className="nota-detail muted">
                   {n.emitente !== 'Você' && <>Emitente: {n.emitente} · </>}
-                  Valor:{' '}
-                  {n.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  Valor: {formatBRL(n.valor)}
                   {n.numero !== '—' && <> · Nº {n.numero}</>}
                 </p>
+                <div className="nota-actions">
+                  <label className="check compact">
+                    <input
+                      type="checkbox"
+                      checked={n.contaNoTeto}
+                      onChange={(e) => onToggleTeto(n.id, e.target.checked)}
+                    />
+                    Conta no teto
+                  </label>
+                  {n.xmlBruto && (
+                    <button
+                      type="button"
+                      className="btn btn-tiny"
+                      onClick={() => {
+                        try {
+                          baixarXml(n)
+                        } catch (err) {
+                          onNotify?.({ text: err.message, tone: 'erro' })
+                        }
+                      }}
+                    >
+                      Baixar XML
+                    </button>
+                  )}
+                  <button type="button" className="btn btn-tiny" onClick={() => onRemove(n.id)}>
+                    Remover
+                  </button>
+                </div>
               </div>
-              <button type="button" className="btn btn-tiny" onClick={() => onRemove(n.id)}>
-                Remover
-              </button>
             </li>
           ))}
         </ul>

@@ -1,45 +1,84 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import DecisorForm from './components/DecisorForm.jsx'
 import CofrePanel from './components/CofrePanel.jsx'
 import Relogio from './components/Relogio.jsx'
 import {
+  ANO_REFERENCIA,
   DATA_NORMA_TELA,
   DISCLAIMER,
   FRASE_PRODUTO,
   LINKS_OFICIAIS,
 } from './engine/constantes.js'
 import {
+  adicionarComDedupe,
+  alternarContaNoTeto,
+  anosDisponiveis,
   carregarCofre,
   limparCofre,
   salvarCofre,
   somarAno,
+  somarMeses,
 } from './engine/cofre.js'
 
 export default function App() {
   const [notas, setNotas] = useState(() => carregarCofre().notas)
+  const [ano, setAno] = useState(ANO_REFERENCIA)
+  const [toast, setToast] = useState(null)
 
-  const soma = useMemo(() => somarAno(notas), [notas])
+  const anos = useMemo(() => anosDisponiveis(notas), [notas])
+  const soma = useMemo(() => somarAno(notas, ano), [notas, ano])
+  const meses = useMemo(() => somarMeses(notas, ano), [notas, ano])
+
+  useEffect(() => {
+    if (!toast) return undefined
+    const t = setTimeout(() => setToast(null), 4000)
+    return () => clearTimeout(t)
+  }, [toast])
+
+  function persist(next, message, tone = 'ok') {
+    try {
+      salvarCofre(next)
+      setNotas(next)
+      if (message) setToast({ text: message, tone })
+    } catch (err) {
+      setToast({ text: err.message || 'Falha ao salvar o cofre.', tone: 'erro' })
+    }
+  }
 
   function handleAdd(nota) {
-    const next = [nota, ...notas]
-    setNotas(next)
-    salvarCofre(next)
+    const { notas: next, duplicata } = adicionarComDedupe(notas, nota)
+    if (duplicata) {
+      setToast({ text: 'Essa nota já está no cofre (duplicata ignorada).', tone: 'warn' })
+      return
+    }
+    persist(next, `${nota.tipo} guardado.`)
+  }
+
+  function handleAddMany(next, message) {
+    persist(next, message)
   }
 
   function handleRemove(id) {
-    const next = notas.filter((n) => n.id !== id)
-    setNotas(next)
-    salvarCofre(next)
+    persist(
+      notas.filter((n) => n.id !== id),
+      'Lançamento removido.',
+      'warn',
+    )
+  }
+
+  function handleToggleTeto(id, contaNoTeto) {
+    persist(alternarContaNoTeto(notas, id, contaNoTeto), 'Marcação do teto atualizada.')
   }
 
   function handleClear() {
     limparCofre()
     setNotas([])
+    setToast({ text: 'Cofre limpo neste navegador.', tone: 'warn' })
   }
 
   return (
     <div className="app">
-      <a className="skip" href="#app">
+      <a className="skip" href="#conteudo">
         Ir ao conteúdo
       </a>
 
@@ -55,7 +94,7 @@ export default function App() {
         </nav>
       </header>
 
-      <main id="app">
+      <main id="conteudo">
         <section className="hero" id="topo">
           <div className="hero-atmosphere" aria-hidden="true">
             <div className="hero-glow" />
@@ -63,12 +102,12 @@ export default function App() {
             <div className="hero-vault">
               <svg viewBox="0 0 640 480" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <defs>
-                  <linearGradient id="vaultFace" x1="120" y1="40" x2="520" y2="440" gradientUnits="userSpaceOnUse">
+                  <linearGradient id="vaultFace" x1="120" y1="40" x2="520" y2="440">
                     <stop stopColor="#1A6B45" />
                     <stop offset="0.55" stopColor="#0C3D28" />
                     <stop offset="1" stopColor="#062318" />
                   </linearGradient>
-                  <linearGradient id="goldRing" x1="260" y1="160" x2="380" y2="300" gradientUnits="userSpaceOnUse">
+                  <linearGradient id="goldRing" x1="260" y1="160" x2="380" y2="300">
                     <stop stopColor="#F5D76E" />
                     <stop offset="1" stopColor="#C8962E" />
                   </linearGradient>
@@ -78,15 +117,9 @@ export default function App() {
                 <circle cx="320" cy="230" r="78" stroke="url(#goldRing)" strokeWidth="10" />
                 <circle cx="320" cy="230" r="42" fill="#0A2E1E" stroke="#E8C45A" strokeWidth="3" />
                 <circle cx="320" cy="230" r="10" fill="#F0C14B" />
-                <path d="M320 188v-18M320 290v18M278 230h-18M380 230h18" stroke="#E8C45A" strokeWidth="4" strokeLinecap="round" opacity="0.7" />
-                <rect x="150" y="130" width="70" height="12" rx="6" fill="#E8C45A" opacity="0.25" />
-                <rect x="420" y="130" width="70" height="12" rx="6" fill="#E8C45A" opacity="0.25" />
-                <rect x="150" y="330" width="70" height="12" rx="6" fill="#E8C45A" opacity="0.2" />
-                <rect x="420" y="330" width="70" height="12" rx="6" fill="#E8C45A" opacity="0.2" />
               </svg>
             </div>
           </div>
-
           <div className="hero-copy">
             <p className="hero-brand">Fiscal Cofre</p>
             <h1>Mapa do teto e do XML para quem vive de Pix e nota.</h1>
@@ -111,19 +144,23 @@ export default function App() {
         </aside>
 
         <section className="section" id="decisor">
-          <DecisorForm />
+          <DecisorForm somaCofre={soma.total} />
         </section>
 
         <section className="section section-relogio" id="relogio">
-          <Relogio soma={soma} />
+          <Relogio soma={soma} meses={meses} ano={ano} anos={anos} onChangeAno={setAno} />
         </section>
 
         <section className="section" id="cofre">
           <CofrePanel
             notas={notas}
+            ano={ano}
             onAdd={handleAdd}
+            onAddMany={handleAddMany}
             onRemove={handleRemove}
+            onToggleTeto={handleToggleTeto}
             onClear={handleClear}
+            onNotify={setToast}
           />
         </section>
 
@@ -155,10 +192,16 @@ export default function App() {
 
       <footer className="footer">
         <p>
-          <strong>Fiscal Cofre</strong> · V1 local · {DATA_NORMA_TELA}
+          <strong>Fiscal Cofre</strong> · sistema local · {DATA_NORMA_TELA}
         </p>
         <p className="muted">{FRASE_PRODUTO}</p>
       </footer>
+
+      {toast && (
+        <div className={`toast toast-${toast.tone}`} role="status">
+          {toast.text}
+        </div>
+      )}
     </div>
   )
 }

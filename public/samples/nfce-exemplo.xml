@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
+  <NFe>
+    <infNFe Id="NFe35260312345678000190650010000004561000004561" versao="4.00">
+      <ide>
+        <cUF>35</cUF>
+        <natOp>Venda consumidor</natOp>
+        <mod>65</mod>
+        <serie>1</serie>
+        <nNF>456</nNF>
+        <dhEmi>2026-06-20T18:45:00-03:00</dhEmi>
+        <tpNF>1</tpNF>
+      </ide>
+      <emit>
+        <CNPJ>12345678000190</CNPJ>
+        <xNome>MEI Exemplo Comercio LTDA</xNome>
+      </emit>
+      <dest>
+        <CPF>12345678909</CPF>
+        <xNome>Consumidor Final</xNome>
+      </dest>
+      <total>
+        <ICMSTot>
+          <vProd>89.90</vProd>
+          <vNF>89.90</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>
